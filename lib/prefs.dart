@@ -20,6 +20,7 @@ class Prefs {
   static List<String> _favs = [];
   static Map<String, int> _highlights = {};
   static Map<String, String> _notes = {};
+  static List<int> _hymnFavs = [];
 
   static Future<void> load() async {
     _p = await SharedPreferences.getInstance();
@@ -29,6 +30,7 @@ class Prefs {
     theme.value = (_p.getInt('theme') ?? 0).clamp(0, 3);
     redLetters.value = _p.getBool('redLetters') ?? false;
     showItalics.value = _p.getBool('showItalics') ?? true;
+    _hymnFavs = [for (final s in _p.getStringList('hymnFavs') ?? const <String>[]) int.parse(s)];
     _favs = List<String>.from(_p.getStringList('favs') ?? const <String>[]);
     try {
       _highlights = Map<String, int>.from(jsonDecode(_p.getString('highlights') ?? '{}') as Map);
@@ -90,6 +92,16 @@ class Prefs {
       if (on) _favs.insert(0, k);
     }
     await _p.setStringList('favs', _favs);
+    libraryChanged.value++;
+  }
+
+  // ---- favorite hymns (hymn numbers)
+  static List<int> get hymnFavorites => List.unmodifiable(_hymnFavs);
+  static bool isHymnFavorite(int n) => _hymnFavs.contains(n);
+
+  static Future<void> toggleHymnFavorite(int n) async {
+    if (!_hymnFavs.remove(n)) _hymnFavs.insert(0, n);
+    await _p.setStringList('hymnFavs', [for (final h in _hymnFavs) '$h']);
     libraryChanged.value++;
   }
 

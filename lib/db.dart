@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 const _assetPath = 'assets/db/kjv.sqlite';
-const _dbVersion = 1; // bump when assets/db/kjv.sqlite changes
+const _dbVersion = 2; // bump when assets/db/kjv.sqlite changes
 
 class Book {
   Book(this.id, this.name, this.abbrev, this.testament, this.chapters);
@@ -33,6 +33,17 @@ class SearchHit {
   SearchHit(this.verse, this.snippet);
   final Verse verse;
   final String snippet; // «matched» words are wrapped in « »
+}
+
+class Hymn {
+  Hymn(this.n, this.title, this.writer, this.year, this.themes, this.scripture, this.lyrics);
+  final int n;
+  final String title;
+  final String writer;
+  final int? year;
+  final String themes;
+  final String scripture;
+  final String lyrics; // blank-line separated stanzas; first line of a stanza may be "Verse 1" / "Chorus"
 }
 
 class Ref {
@@ -137,6 +148,41 @@ class BibleDb {
       [(seed * 7919) % 15000],
     );
     return _verse(rs.isNotEmpty ? rs.first : _db.select('SELECT * FROM verses WHERE id = 26137').first); // John 3:16 fallback
+  }
+
+  // ------------------------------------------------------------ hymns
+
+  Hymn _hymn(Row r) => Hymn(
+        r['n'] as int,
+        r['title'] as String,
+        (r['writer'] as String?) ?? '',
+        r['year'] as int?,
+        (r['themes'] as String?) ?? '',
+        (r['scripture'] as String?) ?? '',
+        (r['lyrics'] as String?) ?? '',
+      );
+
+  /// Every hymn, A to Z (lyrics included; there are only about 500).
+  List<Hymn> allHymns() => [for (final r in _db.select('SELECT * FROM hymns ORDER BY title COLLATE NOCASE')) _hymn(r)];
+
+  Hymn? hymn(int n) {
+    final rs = _db.select('SELECT * FROM hymns WHERE n = ?', [n]);
+    return rs.isEmpty ? null : _hymn(rs.first);
+  }
+
+  /// Searches hymn titles and words. Same syntax as Bible search ("phrase", word*, a w/5 b).
+  List<Hymn> searchHymns(String input, {int limit = 100}) {
+    final q = ftsQuery(input);
+    if (q.isEmpty) return const [];
+    try {
+      final rs = _db.select(
+        'SELECT h.* FROM hymns_fts JOIN hymns h ON h.n = hymns_fts.rowid WHERE hymns_fts MATCH ? ORDER BY bm25(hymns_fts, 8.0, 1.0) LIMIT ?',
+        [q, limit],
+      );
+      return [for (final r in rs) _hymn(r)];
+    } on SqliteException {
+      return const [];
+    }
   }
 
   // ------------------------------------------------------------ search

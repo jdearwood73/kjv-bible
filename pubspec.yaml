@@ -1,5 +1,5 @@
 name: kjv_bible
-description: Offline King James Bible. Easy to read, easy to search.
+description: Offline King James Bible and public-domain hymns. Easy to read, easy to search.
 publish_to: "none"
 version: 0.1.0+1
 

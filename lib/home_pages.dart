@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'db.dart';
+import 'hymns_pages.dart';
 import 'prefs.dart';
 import 'reader_page.dart';
 import 'settings_sheet.dart';
@@ -31,6 +32,7 @@ class _HomeShellState extends State<HomeShell> {
     final pages = [
       ReadTab(db: widget.db),
       SearchTab(db: widget.db),
+      HymnsTab(db: widget.db),
       LibraryTab(db: widget.db),
     ];
     return Scaffold(
@@ -41,6 +43,7 @@ class _HomeShellState extends State<HomeShell> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Read'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
+          NavigationDestination(icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music), label: 'Hymns'),
           NavigationDestination(icon: Icon(Icons.bookmarks_outlined), selectedIcon: Icon(Icons.bookmarks), label: 'Library'),
         ],
       ),
@@ -73,6 +76,7 @@ class ReadTab extends StatelessWidget {
               applicationName: 'KJV Bible',
               children: const [
                 Text('The Authorized (King James) Version, 1769 Cambridge text, public domain in the United States. '
+                    'Hymns: public-domain texts first published 1929 or earlier, from the WorshipCommons library. '
                     'Source: eBible.org. Everything stays on your phone; the app never goes online.'),
               ],
             ),
@@ -297,11 +301,11 @@ class LibraryTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('My library'),
-          bottom: const TabBar(tabs: [Tab(text: 'Favorites'), Tab(text: 'Highlights'), Tab(text: 'Notes')]),
+          bottom: const TabBar(tabs: [Tab(text: 'Favorites'), Tab(text: 'Highlights'), Tab(text: 'Notes'), Tab(text: 'Hymns')]),
         ),
         body: ValueListenableBuilder<int>(
           valueListenable: Prefs.libraryChanged,
@@ -309,6 +313,7 @@ class LibraryTab extends StatelessWidget {
             _list(context, 'favorites', Prefs.favorites),
             _list(context, 'highlights', Prefs.highlights.keys.toList().reversed.toList()),
             _list(context, 'notes', Prefs.notes.keys.toList().reversed.toList()),
+            _hymnList(context),
           ]),
         ),
       ),
@@ -347,6 +352,22 @@ class LibraryTab extends StatelessWidget {
         ),
       ),
     ]);
+  }
+
+  Widget _hymnList(BuildContext context) {
+    final hymns = <Hymn>[for (final n in Prefs.hymnFavorites) if (db.hymn(n) != null) db.hymn(n)!];
+    if (hymns.isEmpty) {
+      return const Center(child: Text('No favorite hymns yet.\nTap the star on a hymn.', textAlign: TextAlign.center));
+    }
+    return ListView.separated(
+      itemCount: hymns.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (c, i) => ListTile(
+        title: Text(hymns[i].title),
+        subtitle: Text(hymns[i].writer, maxLines: 1, overflow: TextOverflow.ellipsis),
+        onTap: () => openHymn(c, hymns[i]),
+      ),
+    );
   }
 
   String _export(List<Verse> verses, String what) {
