@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'db.dart';
 import 'prefs.dart';
+import 'scans.dart';
 import 'settings_sheet.dart';
 import 'verse_text.dart';
 
@@ -105,6 +106,18 @@ class _ReaderPageState extends State<ReaderPage> {
     }
   }
 
+  void _open1611() {
+    final (b, c) = _here;
+    int? v;
+    if (_selected.isNotEmpty) v = _selected.reduce((a, d) => a < d ? a : d);
+    final page = widget.db.page1611(b, c, v);
+    if (page == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No page found for this chapter')));
+      return;
+    }
+    openScan(context, kjv1611, page: page, outline: widget.db.outline1611());
+  }
+
   Future<void> _highlightPicker() async {
     final (b, c) = _here;
     final keys = _selected.map((n) => '$b.$c.$n').toList();
@@ -200,6 +213,11 @@ class _ReaderPageState extends State<ReaderPage> {
             ? IconButton(icon: const Icon(Icons.close), onPressed: () => setState(_selected.clear))
             : null,
         actions: [
+          IconButton(
+            tooltip: 'See this in the 1611 Bible (PDF)',
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: _open1611,
+          ),
           if (!hasSel)
             IconButton(
               tooltip: 'Text size and look',

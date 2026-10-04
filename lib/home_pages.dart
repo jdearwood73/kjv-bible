@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'db.dart';
 import 'hymns_pages.dart';
 import 'prefs.dart';
+import 'scans.dart';
 import 'reader_page.dart';
 import 'settings_sheet.dart';
 import 'verse_text.dart';
@@ -76,7 +77,8 @@ class ReadTab extends StatelessWidget {
               applicationName: 'KJV Bible',
               children: const [
                 Text('The Authorized (King James) Version, 1769 Cambridge text, public domain in the United States. '
-                    'Hymns: public-domain texts first published 1929 or earlier, from the WorshipCommons library. '
+                    'Hymns: public-domain texts first published 1929 or earlier, from the WorshipCommons library, plus the 1883 Baptist Hymnal. '
+                    'The 1883 Baptist Hymnal page scans were digitized by the Library of Congress. '
                     'Source: eBible.org. Everything stays on your phone; the app never goes online.'),
               ],
             ),
@@ -108,6 +110,7 @@ class ReadTab extends StatelessWidget {
               ),
             ),
           ),
+          OldBooksSection(db: db),
           _header(context, 'Old Testament'),
           for (final b in ot) _bookTile(context, b),
           _header(context, 'New Testament'),

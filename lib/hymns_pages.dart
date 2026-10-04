@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'db.dart';
 import 'prefs.dart';
+import 'scans.dart';
 import 'settings_sheet.dart';
 import 'verse_text.dart';
 
@@ -25,6 +26,7 @@ class _HymnsTabState extends State<HymnsTab> {
   late final List<Hymn> _all = widget.db.allHymns();
   List<Hymn> _shown = const [];
   String _q = '';
+  String _src = 'all'; // all, bh (in the 1883 Baptist Hymnal), other
 
   @override
   void initState() {
@@ -42,7 +44,12 @@ class _HymnsTabState extends State<HymnsTab> {
     q = q.trim();
     setState(() {
       _q = q;
-      _shown = q.isEmpty ? _all : widget.db.searchHymns(q);
+      final base = q.isEmpty ? _all : widget.db.searchHymns(q, limit: 400);
+      _shown = switch (_src) {
+        'bh' => [for (final h in base) if (h.bhPage != null) h],
+        'other' => [for (final h in base) if (h.bhPage == null) h],
+        _ => base,
+      };
     });
   }
 
@@ -68,7 +75,15 @@ class _HymnsTabState extends State<HymnsTab> {
           IconButton(icon: const Icon(Icons.text_fields), tooltip: 'Reading settings', onPressed: () => showSettingsSheet(context)),
         ],
       ),
-      body: _shown.isEmpty
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+          child: Wrap(spacing: 8, children: [
+            for (final (k, label) in const [('all', 'All'), ('bh', 'Baptist Hymnal 1883'), ('other', 'Other')])
+              ChoiceChip(label: Text(label), selected: _src == k, onSelected: (_) { _src = k; _run(_ctl.text); }),
+          ]),
+        ),
+        Expanded(child: _shown.isEmpty
           ? const Center(child: Text('No hymns found'))
           : ListView.builder(
               itemCount: _shown.length + (_q.isEmpty ? 1 : 0),
@@ -77,7 +92,7 @@ class _HymnsTabState extends State<HymnsTab> {
                   return const Padding(
                     padding: EdgeInsets.all(20),
                     child: Text(
-                      'Public-domain hymns (first published 1929 or earlier), from the WorshipCommons library.',
+                      'Public-domain hymns (first published 1929 or earlier): the WorshipCommons library and the 1883 Baptist Hymnal (page scans digitized by the Library of Congress).',
                       textAlign: TextAlign.center,
                     ),
                   );
@@ -85,13 +100,14 @@ class _HymnsTabState extends State<HymnsTab> {
                 final h = _shown[i];
                 return ListTile(
                   title: Text(h.title),
-                  subtitle: Text([h.writer, if (h.year != null) '${h.year}'].where((s) => s.isNotEmpty).join(' · '),
+                  subtitle: Text([h.writer, if (h.year != null) '${h.year}', if (h.bhNo != null) 'Baptist Hymnal No. ${h.bhNo}'].where((s) => s.isNotEmpty).join(' · '),
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: Prefs.isHymnFavorite(h.n) ? const Icon(Icons.star, size: 18) : null,
                   onTap: () => openHymn(c, h),
                 );
               },
-            ),
+            )),
+      ]),
     );
   }
 }
@@ -129,6 +145,12 @@ class HymnPage extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied')));
             },
           ),
+          if (hymn.bhPage != null)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Original page (1883 Baptist Hymnal)',
+              onPressed: () => openScan(context, hymnal1883, page: hymn.bhPage),
+            ),
           IconButton(icon: const Icon(Icons.ios_share), tooltip: 'Share', onPressed: () => Share.share(_plain)),
           IconButton(icon: const Icon(Icons.text_fields), tooltip: 'Reading settings', onPressed: () => showSettingsSheet(context)),
         ],
@@ -148,6 +170,12 @@ class HymnPage extends StatelessWidget {
                     [hymn.writer, if (hymn.year != null) '${hymn.year}'].where((s) => s.isNotEmpty).join(' · '),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
+                ),
+              if (hymn.bhNo != null || hymn.bhPage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('1883 Baptist Hymnal${hymn.bhNo != null ? ', No. ${hymn.bhNo}' : ''} · page scans: Library of Congress',
+                      style: Theme.of(context).textTheme.bodySmall),
                 ),
               const SizedBox(height: 16),
               for (final st in stanzas) _stanza(context, st, style),

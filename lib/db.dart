@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 const _assetPath = 'assets/db/kjv.sqlite';
-const _dbVersion = 2; // bump when assets/db/kjv.sqlite changes
+const _dbVersion = 3; // bump when assets/db/kjv.sqlite changes
 
 class Book {
   Book(this.id, this.name, this.abbrev, this.testament, this.chapters);
@@ -36,7 +36,11 @@ class SearchHit {
 }
 
 class Hymn {
-  Hymn(this.n, this.title, this.writer, this.year, this.themes, this.scripture, this.lyrics);
+  Hymn(this.n, this.title, this.writer, this.year, this.themes, this.scripture, this.lyrics,
+      {this.source = '', this.bhNo, this.bhPage});
+  final String source; // 'WorshipCommons' or 'Baptist Hymnal 1883'
+  final int? bhNo; // number in the 1883 Baptist Hymnal, when known
+  final int? bhPage; // page of the scanned 1883 hymnal (PDF page)
   final int n;
   final String title;
   final String writer;
@@ -160,7 +164,36 @@ class BibleDb {
         (r['themes'] as String?) ?? '',
         (r['scripture'] as String?) ?? '',
         (r['lyrics'] as String?) ?? '',
+        source: (r['source'] as String?) ?? '',
+        bhNo: r['bh_no'] as int?,
+        bhPage: r['bh_page'] as int?,
       );
+
+  // ---- 1611 facsimile page lookup (chapter start pages, estimated inside a chapter)
+
+  List<(String, int)> outline1611() => [
+        for (final r in _db.select('SELECT title, page FROM kjv1611_outline ORDER BY idx')) (r['title'] as String, r['page'] as int),
+      ];
+
+  /// PDF page of the 1611 Bible where [book] [chapter] (and [verse], estimated) can be found.
+  int? page1611(int book, int chapter, [int? verse]) {
+    final rs = _db.select('SELECT page FROM kjv1611 WHERE book = ? AND chapter = ?', [book, chapter]);
+    if (rs.isEmpty) return null;
+    final p0 = rs.first['page'] as int;
+    if (verse == null || verse <= 1) return p0;
+    final b = books[book - 1];
+    int pn;
+    if (chapter < b.chapters) {
+      final n = _db.select('SELECT page FROM kjv1611 WHERE book = ? AND chapter = ?', [book, chapter + 1]);
+      pn = n.isEmpty ? p0 : n.first['page'] as int;
+    } else {
+      final n = _db.select('SELECT page FROM kjv1611 WHERE book = ? AND chapter = 999', [book]); // end of book
+      pn = n.isEmpty ? p0 : (n.first['page'] as int);
+    }
+    final nv = _db.select('SELECT COUNT(*) AS c FROM verses WHERE book = ? AND chapter = ?', [book, chapter]).first['c'] as int;
+    if (pn <= p0 || nv <= 1) return p0;
+    return p0 + ((verse - 1) / nv * (pn - p0)).round();
+  }
 
   /// Every hymn, A to Z (lyrics included; there are only about 500).
   List<Hymn> allHymns() => [for (final r in _db.select('SELECT * FROM hymns ORDER BY title COLLATE NOCASE')) _hymn(r)];
